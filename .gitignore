@@ -17,3 +17,8 @@
 configure.wrf*
 *.backup
 *.f90
+
+*.log
+.vscode/
+*out*
+*error*
