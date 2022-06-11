@@ -2,7 +2,7 @@
 
 ./clean -a
 
-./configure <<< "34"
+./configure -D <<< "32"
 
 # turn on RRTMK
 sed -i 's/RRTMK=0/RRTMK=1/g' configure.wrf

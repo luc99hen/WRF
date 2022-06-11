@@ -20,7 +20,10 @@ PROGRAM wrf
 !
 !</DESCRIPTION>
 
-   IMPLICIT NONE
+  implicit none
+
+  real :: t1,t2
+  call cpu_time(t1)
 
 #ifdef _OPENMP
   CALL setfeenv()
@@ -52,6 +55,9 @@ PROGRAM wrf
   IF  ( config_flags%dyn_opt .EQ. dyn_em_ad ) &
   CALL wrf_run_ad_standalone
 #endif
+
+  call cpu_time(t2) 
+  print *, 'nn_wrf_run', t2-t1
 
   ! WRF model clean-up.  This calls MPI_FINALIZE() for DM parallel runs.  
   CALL wrf_finalize
