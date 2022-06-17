@@ -10162,18 +10162,19 @@
    implicit none
 
    integer, parameter ::  nlev=32
-   integer :: use_gpu = 0
+   integer :: use_gpu = 1
    integer :: nn_res
-   TYPE(ftorchmodel) :: model;
+   TYPE(ftorchmodel) :: sw_model, lw_model;
 
-   integer, parameter :: nn_i=325, nn_o=38
-   CHARACTER(100), TARGET :: model_loc = "/luc/lib/ann_cpu.pt"//CHAR(0)  ! CHAR(0) is necessary for C string termination
+   integer, parameter :: nn_i=325, nn_o=38, total_grids=30000
+   CHARACTER(100), TARGET :: sw_model_loc = "/luc/lib/sw_model.pt"//CHAR(0)  ! CHAR(0) is necessary for C string termination
+   CHARACTER(100), TARGET :: lw_model_loc = "/luc/lib/lw_model.pt"//CHAR(0)
 
-   real, dimension(nn_i)       :: snn_in, sw_in_min, sw_in_range
-   real, dimension(nn_o)       :: snn_out, sw_out_min, sw_out_range
+   real, dimension(total_grids,nn_i)       :: snn_in, lnn_in
+   real, dimension(total_grids,nn_o)       :: snn_out, lnn_out
 
-   real, dimension(nn_i)       :: lnn_in, lw_in_min, lw_in_range
-   real, dimension(nn_o)       :: lnn_out, lw_out_min, lw_out_range
+   real, dimension(nn_i)       ::  lw_in_min, lw_in_range, sw_in_min, sw_in_range
+   real, dimension(nn_o)       ::  lw_out_min, lw_out_range, sw_out_min, sw_out_range
 
    real, dimension(7) :: scalar_feature_min, scalar_feature_range
    real, dimension(12) :: scalar_target_min, scalar_target_range
@@ -10187,7 +10188,8 @@ contains
    integer :: row, col, i
 
    ! init NN
-  model = ann_new(model_loc, use_gpu)
+  sw_model = nn_new(sw_model_loc, use_gpu)
+  lw_model = nn_new(lw_model_loc, use_gpu)
   print *, "Load NN Model"  
 
   ! init preprocess parameters
@@ -10339,7 +10341,11 @@ contains
                        ims,ime, jms,jme, kms,kme,                              &
                        its,ite, jts,jte, kts,kte,                              &
 ! for NN emulation
-             nn_lon, nn_lat, topography )
+             i_play, i_tlay, i_h2ovmr, i_o3vmr, i_cldfrac, i_o3, i_qc, i_qi, i_qs, &
+              i_rel, i_rei, i_res, i_clwpth, i_ciwpth, i_cswpth, & 
+              i_albedo, i_coszen, i_tsfc, i_emiss, o_rthratensw, o_rthratenlw, &
+              o_swupt, o_swuptc, o_swdnt, o_swdntc, o_swupb, o_swupbc, o_swdnb, o_swdnbc, &
+              o_lwupt, o_lwuptc, o_lwdnt, o_lwdntc, o_lwupb, o_lwupbc, o_lwdnb, o_lwdnbc, i_topo, nn_lon, nn_lat, topography )
 !-------------------------------------------------------------------------------
 ! abstract : unified rrtmg sw lw driver
 !
@@ -10349,8 +10355,12 @@ contains
 !-------------------------------------------------------------------------------
 !   
 !
+   implicit none
+
    integer, parameter :: natype=5
    real, parameter    :: qmin=0.
+   ! NN emulation
+   real :: t1,t2
 
    logical, intent(in   ) ::  f_qnc, f_qv, f_qc, f_qr, f_qi, f_qs, f_qg
    integer, intent(in   ) ::  ids,ide, jds,jde, kds,kde              
@@ -10359,6 +10369,16 @@ contains
    integer, intent(in   ) ::  no_src
    integer, optional, intent(in   ) :: o3input, aer_opt
 
+   ! for NN emulation 
+   real, dimension(ims:ime,kms:kme,jms:jme) :: &
+   i_play, i_tlay, i_h2ovmr, i_o3vmr, i_cldfrac, o_rthratensw, o_rthratenlw, & 
+   i_rel, i_rei, i_res, i_clwpth, i_ciwpth, i_cswpth
+
+   real, dimension(ims:ime,jms:jme) :: &
+   i_tsfc, i_emiss, i_coszen, i_albedo, i_o3, i_qc, i_qi, i_qs, &
+   o_swupt, o_swuptc, o_swdnt, o_swdntc, o_swupb, o_swupbc, o_swdnb, o_swdnbc, &
+   o_lwupt, o_lwuptc, o_lwdnt, o_lwdntc, o_lwupb, o_lwupbc, o_lwdnb, o_lwdnbc, i_topo
+   
    real, dimension(ims:ime,jms:jme) :: nn_lon, nn_lat, topography
 
    real, dimension(ims:ime,kms:kme,jms:jme), intent(inout) :: rthratensw
@@ -10621,6 +10641,13 @@ contains
    inflglw = 2
    iceflglw = 3
    liqflglw = 1
+
+! Initialization for NN emulation 
+   lnn_in(:,:)    = 0.d0
+   snn_in(:,:)    = 0.d0
+   lnn_out(:,:)   = 0.d0
+   snn_out(:,:)   = 0.d0
+
 !
 ! START LOOP FOR SETTING CLOUD PROPERTY
 !
@@ -10914,30 +10941,23 @@ contains
                                                          cswpth,  lcswpmcl,    &
                                                                   lcldfmcl)
  
-!
-   ! Initialization for NN emulation 
-      lnn_in(:)    = 0.d0
-      snn_in(:)    = 0.d0
-      lnn_out(:)   = 0.d0
-      snn_out(:)   = 0.d0
+      ! NN input 
 
-      lnn_in(1) = tsfc(1) ! surface temperature (K)
-      lnn_in(2) = emiss(i,j) ! surface emissivity
-      lnn_in(3) = nn_lat(i,j)  ! lat
-      lnn_in(4) = nn_lon(i,j)  ! lon
-      lnn_in(5) = topography(i,j) ! surface elevation OR topography
-      lnn_in(6:6+nlev-1) = play(1, 1:nlev)          ! PLAY
-      lnn_in(6+nlev:6+2*nlev-1) = tlay(1, 1:nlev)   ! TLAY
-      lnn_in(6+2*nlev:6+3*nlev-1) = h2ovmr(1, 1:nlev)   ! H2OVMR
-      lnn_in(6+3*nlev:6+4*nlev-1) = o3vmr(1, 1:nlev)   ! O3VMR
-      lnn_in(6+4*nlev:6+5*nlev-1) = cldfrac(1, 1:nlev)   ! CLDFRAC
-      lnn_in(6+5*nlev:6+6*nlev-1) = rel(1, 1:nlev)   ! REL
-      lnn_in(6+6*nlev:6+7*nlev-1) = res(1, 1:nlev)   ! RES
-      lnn_in(6+7*nlev:6+8*nlev-1) = clwpth(1, 1:nlev)   ! CLWPTH
-      lnn_in(6+8*nlev:6+9*nlev-1) = ciwpth(1, 1:nlev)   ! CIWPTH
-      lnn_in(6+9*nlev:6+10*nlev-1) = cswpth(1, 1:nlev)   ! CSWPTH
-
-      lnn_in = (lnn_in-lw_in_min)/ lw_in_range
+      lnn_in((i-1)*jte+j, 1) = tsfc(1) ! surface temperature (K)
+      lnn_in((i-1)*jte+j,2) = emiss(i,j) ! surface emissivity
+      lnn_in((i-1)*jte+j,3) = nn_lat(i,j)  ! lat
+      lnn_in((i-1)*jte+j,4) = nn_lon(i,j)  ! lon
+      lnn_in((i-1)*jte+j,5) = topography(i,j) ! surface elevation OR topography
+      lnn_in((i-1)*jte+j,6:6+nlev-1) = play(1, 1:nlev)          ! PLAY
+      lnn_in((i-1)*jte+j,6+nlev:6+2*nlev-1) = tlay(1, 1:nlev)   ! TLAY
+      lnn_in((i-1)*jte+j,6+2*nlev:6+3*nlev-1) = h2ovmr(1, 1:nlev)   ! H2OVMR
+      lnn_in((i-1)*jte+j,6+3*nlev:6+4*nlev-1) = o3vmr(1, 1:nlev)   ! O3VMR
+      lnn_in((i-1)*jte+j,6+4*nlev:6+5*nlev-1) = cldfrac(1, 1:nlev)   ! CLDFRAC
+      lnn_in((i-1)*jte+j,6+5*nlev:6+6*nlev-1) = rel(1, 1:nlev)   ! REL
+      lnn_in((i-1)*jte+j,6+6*nlev:6+7*nlev-1) = res(1, 1:nlev)   ! RES
+      lnn_in((i-1)*jte+j,6+7*nlev:6+8*nlev-1) = clwpth(1, 1:nlev)   ! CLWPTH
+      lnn_in((i-1)*jte+j,6+8*nlev:6+9*nlev-1) = ciwpth(1, 1:nlev)   ! CIWPTH
+      lnn_in((i-1)*jte+j,6+9*nlev:6+10*nlev-1) = cswpth(1, 1:nlev)   ! CSWPTH
 
        if (dorrsw(i,j)) then
 
@@ -10951,49 +10971,116 @@ contains
            endif
          endif
 
-         snn_in(1) = coszen(1)   ! cosine of solar zenith angle
-         snn_in(2) = albedo(i,j) ! surface albedo
-         snn_in(3) = nn_lat(i,j)  ! lat
-         snn_in(4) = nn_lon(i,j)  ! lon
-         snn_in(5) = topography(i,j) ! surface elevation OR topography
-         snn_in(6:6+nlev-1) = play(1, 1:nlev)          ! PLAY
-         snn_in(6+nlev:6+2*nlev-1) = tlay(1, 1:nlev)   ! TLAY
-         snn_in(6+2*nlev:6+3*nlev-1) = h2ovmr(1, 1:nlev)   ! H2OVMR
-         snn_in(6+3*nlev:6+4*nlev-1) = o3vmr(1, 1:nlev)   ! O3VMR
-         snn_in(6+4*nlev:6+5*nlev-1) = cldfrac(1, 1:nlev)   ! CLDFRAC
-         snn_in(6+5*nlev:6+6*nlev-1) = rel(1, 1:nlev)   ! REL
-         snn_in(6+6*nlev:6+7*nlev-1) = res(1, 1:nlev)   ! RES
-         snn_in(6+7*nlev:6+8*nlev-1) = clwpth(1, 1:nlev)   ! CLWPTH
-         snn_in(6+8*nlev:6+9*nlev-1) = ciwpth(1, 1:nlev)   ! CIWPTH
-         snn_in(6+9*nlev:6+10*nlev-1) = cswpth(1, 1:nlev)   ! CSWPTH
+         snn_in((i-1)*jte+j,1) = coszen(1)   ! cosine of solar zenith angle
+         snn_in((i-1)*jte+j,2) = albedo(i,j) ! surface albedo
+         snn_in((i-1)*jte+j,3) = nn_lat(i,j)  ! lat
+         snn_in((i-1)*jte+j,4) = nn_lon(i,j)  ! lon
+         snn_in((i-1)*jte+j,5) = topography(i,j) ! surface elevation OR topography
+         snn_in((i-1)*jte+j,6:6+nlev-1) = play(1, 1:nlev)          ! PLAY
+         snn_in((i-1)*jte+j,6+nlev:6+2*nlev-1) = tlay(1, 1:nlev)   ! TLAY
+         snn_in((i-1)*jte+j,6+2*nlev:6+3*nlev-1) = h2ovmr(1, 1:nlev)   ! H2OVMR
+         snn_in((i-1)*jte+j,6+3*nlev:6+4*nlev-1) = o3vmr(1, 1:nlev)   ! O3VMR
+         snn_in((i-1)*jte+j,6+4*nlev:6+5*nlev-1) = cldfrac(1, 1:nlev)   ! CLDFRAC
+         snn_in((i-1)*jte+j,6+5*nlev:6+6*nlev-1) = rel(1, 1:nlev)   ! REL
+         snn_in((i-1)*jte+j,6+6*nlev:6+7*nlev-1) = res(1, 1:nlev)   ! RES
+         snn_in((i-1)*jte+j,6+7*nlev:6+8*nlev-1) = clwpth(1, 1:nlev)   ! CLWPTH
+         snn_in((i-1)*jte+j,6+8*nlev:6+9*nlev-1) = ciwpth(1, 1:nlev)   ! CIWPTH
+         snn_in((i-1)*jte+j,6+9*nlev:6+10*nlev-1) = cswpth(1, 1:nlev)   ! CSWPTH
          
-         snn_in = (snn_in-sw_in_min) / sw_in_range
-         ! use nn model
-         nn_res = ann_forward(model, snn_in, snn_out)
-         
-         snn_out = snn_out*sw_out_range + sw_out_min
-         swupt(i, j) = snn_out(1)
-         swuptc(i, j) = snn_out(2)
-         swupb(i, j) = snn_out(3)
-         swupbc(i, j) = snn_out(4)
-         swdnb(i, j) = snn_out(5)
-         swdnbc(i, j) = snn_out(6)
-         rthratensw(i,:,j) = snn_out(7:nn_o)
-         
+         snn_in((i-1)*jte+j,:) = (snn_in((i-1)*jte+j,:)-sw_in_min) / sw_in_range
+
        endif ! do SW
+
+       ! nn normalize input 
+      lnn_in((i-1)*jte+j,:) = (lnn_in((i-1)*jte+j,:)-lw_in_min) / lw_in_range
       
-      ! use nn model
-      nn_res = ann_forward(model, lnn_in, lnn_out)
-      lnn_out = lnn_out*lw_out_range + lw_out_min
-      lwupt(i, j) = lnn_out(1)
-      lwuptc(i, j) = lnn_out(2)
-      lwupb(i, j) = lnn_out(3)
-      lwupbc(i, j) = lnn_out(4)
-      lwdnb(i, j) = lnn_out(5)
-      lwdnbc(i, j) = lnn_out(6)
-      rthratenlw(i,:,j) = lnn_out(7:)
+            
+      ! Inputs for NN emulation
+       i_play(i,:,j) = play(1,:) ! pressure (hPa) 
+       i_tlay(i,:,j) = tlay(1,:) ! temperature (K) 
+       i_h2ovmr(i,:,j) = h2ovmr(1,:) ! water vapor mixing ratio (kg/kg)
+       i_o3vmr(i,:,j) = o3vmr(1,:) ! ozone mixing ratio (ppmv)
+       i_cldfrac(i,:,j) = cldfrac(1,:) ! layer cloud fraction
+       i_o3(i,j) = 0
+       i_qc(i,j) = 0
+       i_qi(i,j) = 0
+       i_qs(i,j) = 0
+       do k = kts, kte
+       i_o3(i,j) = o3vmr(1,k)*pdel(k)*1000./g + o3vmr(1,k) ! g m-2
+       i_qc(i,j) = clwpth(1,k) + i_qc(i,j) ! liquid water path
+       i_qi(i,j) = ciwpth(1,k) + i_qi(i,j) ! ice water path
+       i_qs(i,j) = cswpth(1,k) + i_qs(i,j) ! snow water path
+       enddo
+       i_rel(i,:,j) = rel(1,:) ! cloud liquid effective radius (um)
+       i_rei(i,:,j) = rei(1,:) ! cloud ice effective radius (um)
+       i_res(i,:,j) = res(1,:) ! cloud snow effective radius (um)
+       i_clwpth(i,:,j) = clwpth(1,:) ! layer cloud liquid water path (g/m2)
+       i_ciwpth(i,:,j) = ciwpth(1,:) ! layer cloud ice water path (g/m2)
+       i_cswpth(i,:,j) = cswpth(1,:) ! layer cloud snow water path (g/m2)
+       i_tsfc(i,j) = tsfc(1) ! surface temperature (K)
+       i_emiss(i,j) = emiss(i,j) ! surface emissivity
+       i_coszen(i,j) = coszen(1) ! cosine of solar zenith angle
+       i_albedo(i,j) = albedo(i,j) ! surface albedo
+       i_topo(i,j) = topography(i,j) ! surface elevation OR topography
 
      enddo ! jts:jte end j LOOP 
+   enddo ! its:ite end GRAND LOOP
+
+   call cpu_time(t1)
+
+   ! nn call model
+   nn_res = nn_forward(lw_model, lnn_in, lnn_out)
+   nn_res = nn_forward(sw_model, snn_in, snn_out)
+
+   call cpu_time(t2)
+   print *, 'nn_rrtmgk_forward', t2-t1
+
+   ! nn pass output back to wrf 
+   do j = jts,jte 
+     do i = its,ite
+         ! nn denormaize output
+         lnn_out((i-1)*jte+j,:) = lnn_out((i-1)*jte+j,:)*lw_out_range + lw_out_min
+
+         if (dorrsw(i,j)) then
+            snn_out((i-1)*jte+j,:) = snn_out((i-1)*jte+j,:)*sw_out_range + sw_out_min
+            swupt(i, j) = snn_out((i-1)*jte+j,1)
+            swuptc(i, j) = snn_out((i-1)*jte+j,2)
+            swupb(i, j) = snn_out((i-1)*jte+j,3)
+            swupbc(i, j) = snn_out((i-1)*jte+j,4)
+            swdnb(i, j) = snn_out((i-1)*jte+j,5)
+            swdnbc(i, j) = snn_out((i-1)*jte+j,6)
+            rthratensw(i,1:nlev,j) = snn_out((i-1)*jte+j,7:)
+         end if
+
+         lwupt(i, j) = lnn_out((i-1)*jte+j,1)
+         lwuptc(i, j) = lnn_out((i-1)*jte+j,2)
+         lwupb(i, j) = lnn_out((i-1)*jte+j,3)
+         lwupbc(i, j) = lnn_out((i-1)*jte+j,4)
+         lwdnb(i, j) = lnn_out((i-1)*jte+j,5)
+         lwdnbc(i, j) = lnn_out((i-1)*jte+j,6)
+         rthratenlw(i,1:nlev,j) = lnn_out((i-1)*jte+j,7:)
+
+         ! Outputs for NN emulation
+         o_rthratensw(i,:,j) = rthratensw(i,:,j) ! total sky shortwave radiative heating rate (K/s) 
+         o_swupt(i,j)  = swupt(i,j)  ! total sky shortwave upward flux at TOA (W/m2)
+         o_swuptc(i,j) = swuptc(i,j) ! clear sky shortwave upward flux at TOA (W/m2)
+         o_swdnt(i,j)  = swdnt(i,j)  ! total sky shortwave downward flux at TOA (W/m2)
+         o_swdntc(i,j) = swdntc(i,j) ! clear sky shortwave downward flux at TOA (W/m2)
+         o_swupb(i,j)  = swupb(i,j)  ! total sky shortwave upward flux at surface (W/m2)
+         o_swupbc(i,j) = swupbc(i,j) ! clear sky shortwave upward flux at surface (W/m2)
+         o_swdnb(i,j)  = swdnb(i,j)  ! total sky shortwave downward flux at surface (W/m2)
+         o_swdnbc(i,j) = swdnbc(i,j) ! clear sky shortwave downward flux at surface (W/m2)
+         o_rthratenlw(i,:,j) = rthratenlw(i,:,j) ! total sky longwave radiative heating rate (K/s) 
+         o_lwupt(i,j)  = lwupt(i,j)  ! total sky longwave upward flux at TOA (W/m2)
+         o_lwuptc(i,j) = lwuptc(i,j) ! clear sky longwave upward flux at TOA (W/m2)
+         o_lwdnt(i,j)  = lwdnt(i,j)  ! total sky longwave downward flux at TOA (W/m2)
+         o_lwdntc(i,j) = lwdntc(i,j) ! clear sky longwave downward flux at TOA (W/m2)
+         o_lwupb(i,j)  = lwupb(i,j)  ! total sky longwave upward flux at surface (W/m2)
+         o_lwupbc(i,j) = lwupbc(i,j) ! clear sky longwave upward flux at surface (W/m2)
+         o_lwdnb(i,j)  = lwdnb(i,j)  ! total sky longwave downward flux at surface (W/m2)
+         o_lwdnbc(i,j) = lwdnbc(i,j) ! clear sky longwave downward flux at surface (W/m2)
+      
+      enddo ! jts:jte end j LOOP 
    enddo ! its:ite end GRAND LOOP
 
    ! Replaced variables

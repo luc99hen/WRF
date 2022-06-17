@@ -10,7 +10,7 @@
  end_year                            = 2021, 
  end_month                           = 01,  
  end_day                             = 01,   
- end_hour                            = 02,  
+ end_hour                            = 24,  
  interval_seconds                    = 21600,
  input_from_file                     = .true.,
  history_interval                    = 60,

@@ -451,8 +451,21 @@ BENCH_START(rad_driver_tim)
      &         ,MP_PHYSICS=CONFIG_FLAGS%MP_PHYSICS        &
      &         ,EFCG=grid%EFCG,EFCS=grid%EFCS,EFIG=grid%EFIG &
      &         ,EFIS=grid%EFIS,EFSG=grid%EFSG,aercu_opt=config_flags%aercu_opt & 
-     &         ,EFSS=grid%EFSS,QS_CU=grid%QS_CU &
-     &         ,TOPOGRAPHY=topography )
+     &         ,EFSS=grid%EFSS,QS_CU=grid%QS_CU & ! for NN emulation (Lu, 2022-06-15)
+     &         ,I_PLAY=grid%i_play, I_TLAY=grid%i_tlay, I_H2OVMR=grid%i_h2ovmr, I_O3VMR=grid%i_o3vmr  &
+     &         ,I_CLDFRAC=grid%i_cldfrac, I_O3=grid%i_o3, I_QC=grid%i_qc, I_QI=grid%i_qi  &
+     &         ,I_QS=grid%i_qs, I_REL=grid%i_rel, I_REI=grid%i_rei, I_RES=grid%i_res &
+     &         ,I_CLWPTH=grid%i_clwpth, I_CIWPTH=grid%i_ciwpth, I_CSWPTH=grid%i_cswpth &
+     &         ,I_TSFC=grid%i_tsfc, I_EMISS=grid%i_emiss &
+     &         ,I_COSZEN=grid%i_coszen, I_ALBEDO=grid%i_albedo  &
+     &         ,O_RTHRATENSW=grid%o_rthratensw, O_RTHRATENLW=grid%o_rthratenlw &
+     &         ,O_SWUPT=grid%o_swupt, O_SWUPTC=grid%o_swuptc  &
+     &         ,O_SWDNT=grid%o_swdnt, O_SWDNTC=grid%o_swdntc, O_SWUPB=grid%o_swupb &
+     &         ,O_SWUPBC=grid%o_swupbc, O_SWDNB=grid%o_swdnb, O_SWDNBC=grid%o_swdnbc &
+     &         ,O_LWUPT=grid%o_lwupt, O_LWUPTC=grid%o_lwuptc &
+     &         ,O_LWDNT=grid%o_lwdnt, O_LWDNTC=grid%o_lwdntc, O_LWUPB=grid%o_lwupb &
+     &         ,O_LWUPBC=grid%o_lwupbc, O_LWDNB=grid%o_lwdnb, O_LWDNBC=grid%o_lwdnbc &
+     &         ,I_TOPO=grid%i_topo, TOPOGRAPHY=topography )
 
 BENCH_END(rad_driver_tim)
 
