@@ -10166,7 +10166,7 @@
    integer :: nn_res
    TYPE(ftorchmodel) :: sw_model, lw_model;
 
-   integer, parameter :: nn_i=325, nn_o=38, total_grids=30000
+   integer, parameter :: nn_i=325, nn_o=38, total_grids=43008
    CHARACTER(100), TARGET :: sw_model_loc = "/luc/lib/sw_model.pt"//CHAR(0)  ! CHAR(0) is necessary for C string termination
    CHARACTER(100), TARGET :: lw_model_loc = "/luc/lib/lw_model.pt"//CHAR(0)
 
@@ -10178,7 +10178,7 @@
 
    real, dimension(7) :: scalar_feature_min, scalar_feature_range
    real, dimension(12) :: scalar_target_min, scalar_target_range
-   real, dimension(11, 32) :: vector_feature_min, vector_feature_range
+   real, dimension(10, 32) :: vector_feature_min, vector_feature_range
    real, dimension(2, 32) :: vector_target_min, vector_target_range
 
 contains
@@ -10203,11 +10203,11 @@ contains
   close(201)
 
   open(unit=202, file="./nn_data/vf_min", status="old")
-  read(202, *) ((vector_feature_min(row,col),col=1,32),row=1,11)
+  read(202, *) ((vector_feature_min(row,col),col=1,32),row=1,10)
   close(202)
 
   open(unit=203, file="./nn_data/vf_range", status="old")
-  read(203, *) ((vector_feature_range(row,col),col=1,32),row=1,11)
+  read(203, *) ((vector_feature_range(row,col),col=1,32),row=1,10)
   close(203)
 
   open(unit=204, file="./nn_data/st_min", status="old")
@@ -10232,11 +10232,11 @@ contains
   sw_in_min(6+2*nlev:6+3*nlev-1) = vector_feature_min(3, :)   ! H2OVMR
   sw_in_min(6+3*nlev:6+4*nlev-1) = vector_feature_min(4, :)   ! O3VMR
   sw_in_min(6+4*nlev:6+5*nlev-1) = vector_feature_min(5, :)   ! CLDFRAC
-  sw_in_min(6+5*nlev:6+6*nlev-1) = vector_feature_min(7, :)   ! REL
-  sw_in_min(6+6*nlev:6+7*nlev-1) = vector_feature_min(8, :)   ! RES
-  sw_in_min(6+7*nlev:6+8*nlev-1) = vector_feature_min(9, :)   ! CLWPTH
-  sw_in_min(6+8*nlev:6+9*nlev-1) = vector_feature_min(10, :)   ! CIWPTH
-  sw_in_min(6+9*nlev:6+10*nlev-1) = vector_feature_min(11, :)   ! CSWPTH
+  sw_in_min(6+5*nlev:6+6*nlev-1) = vector_feature_min(6, :)   ! REL
+  sw_in_min(6+6*nlev:6+7*nlev-1) = vector_feature_min(7, :)   ! RES
+  sw_in_min(6+7*nlev:6+8*nlev-1) = vector_feature_min(8, :)   ! CLWPTH
+  sw_in_min(6+8*nlev:6+9*nlev-1) = vector_feature_min(9, :)   ! CIWPTH
+  sw_in_min(6+9*nlev:6+10*nlev-1) = vector_feature_min(10, :)   ! CSWPTH
 
   sw_in_range(:5) = scalar_feature_range([1, 2, 5, 6, 7])
   sw_in_range(6:6+nlev-1) = vector_feature_range(1, :)          ! PLAY
@@ -10244,11 +10244,11 @@ contains
   sw_in_range(6+2*nlev:6+3*nlev-1) = vector_feature_range(3, :)   ! H2OVMR
   sw_in_range(6+3*nlev:6+4*nlev-1) = vector_feature_range(4, :)   ! O3VMR
   sw_in_range(6+4*nlev:6+5*nlev-1) = vector_feature_range(5, :)   ! CLDFRAC
-  sw_in_range(6+5*nlev:6+6*nlev-1) = vector_feature_range(7, :)   ! REL
-  sw_in_range(6+6*nlev:6+7*nlev-1) = vector_feature_range(8, :)   ! RES
-  sw_in_range(6+7*nlev:6+8*nlev-1) = vector_feature_range(9, :)   ! CLWPTH
-  sw_in_range(6+8*nlev:6+9*nlev-1) = vector_feature_range(10, :)   ! CIWPTH
-  sw_in_range(6+9*nlev:6+10*nlev-1) = vector_feature_range(11, :)   ! CSWPTH
+  sw_in_range(6+5*nlev:6+6*nlev-1) = vector_feature_range(6, :)   ! REL
+  sw_in_range(6+6*nlev:6+7*nlev-1) = vector_feature_range(7, :)   ! RES
+  sw_in_range(6+7*nlev:6+8*nlev-1) = vector_feature_range(8, :)   ! CLWPTH
+  sw_in_range(6+8*nlev:6+9*nlev-1) = vector_feature_range(9, :)   ! CIWPTH
+  sw_in_range(6+9*nlev:6+10*nlev-1) = vector_feature_range(10, :)   ! CSWPTH
 
   sw_out_min(:6) = scalar_target_min(1:6)
   sw_out_min(7:) = vector_target_min(1,:)
@@ -10262,11 +10262,11 @@ contains
   lw_in_min(6+2*nlev:6+3*nlev-1) = vector_feature_min(3, :)   ! H2OVMR
   lw_in_min(6+3*nlev:6+4*nlev-1) = vector_feature_min(4, :)   ! O3VMR
   lw_in_min(6+4*nlev:6+5*nlev-1) = vector_feature_min(5, :)   ! CLDFRAC
-  lw_in_min(6+5*nlev:6+6*nlev-1) = vector_feature_min(7, :)   ! REL
-  lw_in_min(6+6*nlev:6+7*nlev-1) = vector_feature_min(8, :)   ! RES
-  lw_in_min(6+7*nlev:6+8*nlev-1) = vector_feature_min(9, :)   ! CLWPTH
-  lw_in_min(6+8*nlev:6+9*nlev-1) = vector_feature_min(10, :)   ! CIWPTH
-  lw_in_min(6+9*nlev:6+10*nlev-1) = vector_feature_min(11, :)   ! CSWPTH
+  lw_in_min(6+5*nlev:6+6*nlev-1) = vector_feature_min(6, :)   ! REL
+  lw_in_min(6+6*nlev:6+7*nlev-1) = vector_feature_min(7, :)   ! RES
+  lw_in_min(6+7*nlev:6+8*nlev-1) = vector_feature_min(8, :)   ! CLWPTH
+  lw_in_min(6+8*nlev:6+9*nlev-1) = vector_feature_min(9, :)   ! CIWPTH
+  lw_in_min(6+9*nlev:6+10*nlev-1) = vector_feature_min(10, :)   ! CSWPTH
 
   lw_in_range(:5) = scalar_feature_range([3, 4, 5, 6, 7])
   lw_in_range(6:6+nlev-1) = vector_feature_range(1, :)          ! PLAY
@@ -10274,11 +10274,11 @@ contains
   lw_in_range(6+2*nlev:6+3*nlev-1) = vector_feature_range(3, :)   ! H2OVMR
   lw_in_range(6+3*nlev:6+4*nlev-1) = vector_feature_range(4, :)   ! O3VMR
   lw_in_range(6+4*nlev:6+5*nlev-1) = vector_feature_range(5, :)   ! CLDFRAC
-  lw_in_range(6+5*nlev:6+6*nlev-1) = vector_feature_range(7, :)   ! REL
-  lw_in_range(6+6*nlev:6+7*nlev-1) = vector_feature_range(8, :)   ! RES
-  lw_in_range(6+7*nlev:6+8*nlev-1) = vector_feature_range(9, :)   ! CLWPTH
-  lw_in_range(6+8*nlev:6+9*nlev-1) = vector_feature_range(10, :)   ! CIWPTH
-  lw_in_range(6+9*nlev:6+10*nlev-1) = vector_feature_range(11, :)   ! CSWPTH
+  lw_in_range(6+5*nlev:6+6*nlev-1) = vector_feature_range(6, :)   ! REL
+  lw_in_range(6+6*nlev:6+7*nlev-1) = vector_feature_range(7, :)   ! RES
+  lw_in_range(6+7*nlev:6+8*nlev-1) = vector_feature_range(8, :)   ! CLWPTH
+  lw_in_range(6+8*nlev:6+9*nlev-1) = vector_feature_range(9, :)   ! CIWPTH
+  lw_in_range(6+9*nlev:6+10*nlev-1) = vector_feature_range(10, :)   ! CSWPTH
 
   lw_out_min(:6) = scalar_target_min(7:)
   lw_out_min(7:) = vector_target_min(2,:)
@@ -10945,9 +10945,9 @@ contains
 
       lnn_in((i-1)*jte+j, 1) = tsfc(1) ! surface temperature (K)
       lnn_in((i-1)*jte+j,2) = emiss(i,j) ! surface emissivity
-      lnn_in((i-1)*jte+j,3) = nn_lat(i,j)  ! lat
-      lnn_in((i-1)*jte+j,4) = nn_lon(i,j)  ! lon
-      lnn_in((i-1)*jte+j,5) = topography(i,j) ! surface elevation OR topography
+      lnn_in((i-1)*jte+j,4) = nn_lat(i,j)  ! lat
+      lnn_in((i-1)*jte+j,5) = nn_lon(i,j)  ! lon
+      lnn_in((i-1)*jte+j,3) = topography(i,j) ! surface elevation OR topography
       lnn_in((i-1)*jte+j,6:6+nlev-1) = play(1, 1:nlev)          ! PLAY
       lnn_in((i-1)*jte+j,6+nlev:6+2*nlev-1) = tlay(1, 1:nlev)   ! TLAY
       lnn_in((i-1)*jte+j,6+2*nlev:6+3*nlev-1) = h2ovmr(1, 1:nlev)   ! H2OVMR
@@ -10961,21 +10961,11 @@ contains
 
        if (dorrsw(i,j)) then
 
-         if (present(aerod)) then
-           if (aer_opt.eq.1) then
-             do na = 1,naerec
-                do k = kts, kte
-                 ecaer(ncol,k,na) = aerod(i,k,j,na)
-                enddo
-             enddo
-           endif
-         endif
-
          snn_in((i-1)*jte+j,1) = coszen(1)   ! cosine of solar zenith angle
          snn_in((i-1)*jte+j,2) = albedo(i,j) ! surface albedo
-         snn_in((i-1)*jte+j,3) = nn_lat(i,j)  ! lat
-         snn_in((i-1)*jte+j,4) = nn_lon(i,j)  ! lon
-         snn_in((i-1)*jte+j,5) = topography(i,j) ! surface elevation OR topography
+         snn_in((i-1)*jte+j,4) = nn_lat(i,j)  ! lat
+         snn_in((i-1)*jte+j,5) = nn_lon(i,j)  ! lon
+         snn_in((i-1)*jte+j,3) = topography(i,j) ! surface elevation OR topography
          snn_in((i-1)*jte+j,6:6+nlev-1) = play(1, 1:nlev)          ! PLAY
          snn_in((i-1)*jte+j,6+nlev:6+2*nlev-1) = tlay(1, 1:nlev)   ! TLAY
          snn_in((i-1)*jte+j,6+2*nlev:6+3*nlev-1) = h2ovmr(1, 1:nlev)   ! H2OVMR
@@ -11029,6 +11019,11 @@ contains
    call cpu_time(t1)
 
    ! nn call model
+   where (lnn_in  < 0.d0) lnn_in  = 0.d0
+   where (lnn_in  > 1.d0) lnn_in  = 1.d0
+   where (snn_in  < 0.d0) snn_in  = 0.d0
+   where (snn_in  > 1.d0) snn_in  = 1.d0
+
    nn_res = nn_forward(lw_model, lnn_in, lnn_out)
    nn_res = nn_forward(sw_model, snn_in, snn_out)
 
