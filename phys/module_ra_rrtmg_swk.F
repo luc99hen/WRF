@@ -10189,7 +10189,7 @@ contains
 
    ! init NN
   sw_model = nn_new(sw_model_loc, use_gpu)
-  lw_model = nn_new(lw_model_loc, use_gpu)
+!   lw_model = nn_new(lw_model_loc, use_gpu)
   print *, "Load NN Model"  
 
   ! init preprocess parameters
@@ -10941,23 +10941,25 @@ contains
                                                          cswpth,  lcswpmcl,    &
                                                                   lcldfmcl)
  
+      
+
       ! NN input 
 
-      lnn_in((i-1)*jte+j, 1) = tsfc(1) ! surface temperature (K)
-      lnn_in((i-1)*jte+j,2) = emiss(i,j) ! surface emissivity
-      lnn_in((i-1)*jte+j,4) = nn_lat(i,j)  ! lat
-      lnn_in((i-1)*jte+j,5) = nn_lon(i,j)  ! lon
-      lnn_in((i-1)*jte+j,3) = topography(i,j) ! surface elevation OR topography
-      lnn_in((i-1)*jte+j,6:6+nlev-1) = play(1, 1:nlev)          ! PLAY
-      lnn_in((i-1)*jte+j,6+nlev:6+2*nlev-1) = tlay(1, 1:nlev)   ! TLAY
-      lnn_in((i-1)*jte+j,6+2*nlev:6+3*nlev-1) = h2ovmr(1, 1:nlev)   ! H2OVMR
-      lnn_in((i-1)*jte+j,6+3*nlev:6+4*nlev-1) = o3vmr(1, 1:nlev)   ! O3VMR
-      lnn_in((i-1)*jte+j,6+4*nlev:6+5*nlev-1) = cldfrac(1, 1:nlev)   ! CLDFRAC
-      lnn_in((i-1)*jte+j,6+5*nlev:6+6*nlev-1) = rel(1, 1:nlev)   ! REL
-      lnn_in((i-1)*jte+j,6+6*nlev:6+7*nlev-1) = res(1, 1:nlev)   ! RES
-      lnn_in((i-1)*jte+j,6+7*nlev:6+8*nlev-1) = clwpth(1, 1:nlev)   ! CLWPTH
-      lnn_in((i-1)*jte+j,6+8*nlev:6+9*nlev-1) = ciwpth(1, 1:nlev)   ! CIWPTH
-      lnn_in((i-1)*jte+j,6+9*nlev:6+10*nlev-1) = cswpth(1, 1:nlev)   ! CSWPTH
+      ! lnn_in((i-1)*jte+j, 1) = tsfc(1) ! surface temperature (K)
+      ! lnn_in((i-1)*jte+j,2) = emiss(i,j) ! surface emissivity
+      ! lnn_in((i-1)*jte+j,4) = nn_lat(i,j)  ! lat
+      ! lnn_in((i-1)*jte+j,5) = nn_lon(i,j)  ! lon
+      ! lnn_in((i-1)*jte+j,3) = topography(i,j) ! surface elevation OR topography
+      ! lnn_in((i-1)*jte+j,6:6+nlev-1) = play(1, 1:nlev)          ! PLAY
+      ! lnn_in((i-1)*jte+j,6+nlev:6+2*nlev-1) = tlay(1, 1:nlev)   ! TLAY
+      ! lnn_in((i-1)*jte+j,6+2*nlev:6+3*nlev-1) = h2ovmr(1, 1:nlev)   ! H2OVMR
+      ! lnn_in((i-1)*jte+j,6+3*nlev:6+4*nlev-1) = o3vmr(1, 1:nlev)   ! O3VMR
+      ! lnn_in((i-1)*jte+j,6+4*nlev:6+5*nlev-1) = cldfrac(1, 1:nlev)   ! CLDFRAC
+      ! lnn_in((i-1)*jte+j,6+5*nlev:6+6*nlev-1) = rel(1, 1:nlev)   ! REL
+      ! lnn_in((i-1)*jte+j,6+6*nlev:6+7*nlev-1) = res(1, 1:nlev)   ! RES
+      ! lnn_in((i-1)*jte+j,6+7*nlev:6+8*nlev-1) = clwpth(1, 1:nlev)   ! CLWPTH
+      ! lnn_in((i-1)*jte+j,6+8*nlev:6+9*nlev-1) = ciwpth(1, 1:nlev)   ! CIWPTH
+      ! lnn_in((i-1)*jte+j,6+9*nlev:6+10*nlev-1) = cswpth(1, 1:nlev)   ! CSWPTH
 
        if (dorrsw(i,j)) then
 
@@ -10982,7 +10984,39 @@ contains
        endif ! do SW
 
        ! nn normalize input 
-      lnn_in((i-1)*jte+j,:) = (lnn_in((i-1)*jte+j,:)-lw_in_min) / lw_in_range
+      ! lnn_in((i-1)*jte+j,:) = (lnn_in((i-1)*jte+j,:)-lw_in_min) / lw_in_range
+
+      !
+! Call RRTMG longwave radiation model
+!
+       call rrtmg_lw                                                           &
+                     (ncol, nlay, icld, play, plev , tlay,                     &
+                      tlev ,tsfc, h2ovmr, o3vmr, co2vmr, ch4vmr,               &
+                      n2ovmr, o2vmr, cfc11vmr, cfc12vmr, cfc22vmr, ccl4vmr,    &
+                      emis, inflglw, iceflglw, liqflglw, lcldfmcl,             &
+                      ltaucmcl, lciwpmcl, lclwpmcl, rei, rel,                  &
+                      lcswpmcl, res,                                           &
+                      ltauaer,                                                 &
+                      uflx, dflx, hr, uflxc, dflxc, hrc)
+!
+       rthratenlw(i,kts:kte,j) = hr(1,kts:kte)/86400.
+       if(present(lwupflx))then
+         lwupflx(i,kts:kte+2,j) = uflx(1,kts:kte+2)
+         lwupflxc(i,kts:kte+2,j) = uflxc(1,kts:kte+2)
+         lwdnflx(i,kts:kte+2,j) = dflx(1,kts:kte+2)
+         lwdnflxc(i,kts:kte+2,j) = dflxc(1,kts:kte+2)
+       endif
+       glw(i,j) = dflx(1,1) 
+       olr(i,j) = uflx(1,kte+2)
+       lwcf(i,j) = uflxc(1,kte+2) - uflx(1,kte+2)
+       lwupt(i,j)     = uflx(1,kte+2)
+       lwuptc(i,j)    = uflxc(1,kte+2)
+       lwdnt(i,j)     = dflx(1,kte+2)
+       lwdntc(i,j)    = dflxc(1,kte+2)
+       lwupb(i,j)     = uflx(1,1)
+       lwupbc(i,j)    = uflxc(1,1)
+       lwdnb(i,j)     = dflx(1,1)
+       lwdnbc(i,j)    = dflxc(1,1)
       
             
       ! Inputs for NN emulation
@@ -11019,12 +11053,12 @@ contains
    call cpu_time(t1)
 
    ! nn call model
-   where (lnn_in  < 0.d0) lnn_in  = 0.d0
-   where (lnn_in  > 1.d0) lnn_in  = 1.d0
+   ! where (lnn_in  < 0.d0) lnn_in  = 0.d0
+   ! where (lnn_in  > 1.d0) lnn_in  = 1.d0
    where (snn_in  < 0.d0) snn_in  = 0.d0
    where (snn_in  > 1.d0) snn_in  = 1.d0
 
-   nn_res = nn_forward(lw_model, lnn_in, lnn_out)
+   ! nn_res = nn_forward(lw_model, lnn_in, lnn_out)
    nn_res = nn_forward(sw_model, snn_in, snn_out)
 
    call cpu_time(t2)
@@ -11034,7 +11068,7 @@ contains
    do j = jts,jte 
      do i = its,ite
          ! nn denormaize output
-         lnn_out((i-1)*jte+j,:) = lnn_out((i-1)*jte+j,:)*lw_out_range + lw_out_min
+         ! lnn_out((i-1)*jte+j,:) = lnn_out((i-1)*jte+j,:)*lw_out_range + lw_out_min
 
          if (dorrsw(i,j)) then
             snn_out((i-1)*jte+j,:) = snn_out((i-1)*jte+j,:)*sw_out_range + sw_out_min
@@ -11047,13 +11081,13 @@ contains
             rthratensw(i,1:nlev,j) = snn_out((i-1)*jte+j,7:)
          end if
 
-         lwupt(i, j) = lnn_out((i-1)*jte+j,1)
-         lwuptc(i, j) = lnn_out((i-1)*jte+j,2)
-         lwupb(i, j) = lnn_out((i-1)*jte+j,3)
-         lwupbc(i, j) = lnn_out((i-1)*jte+j,4)
-         lwdnb(i, j) = lnn_out((i-1)*jte+j,5)
-         lwdnbc(i, j) = lnn_out((i-1)*jte+j,6)
-         rthratenlw(i,1:nlev,j) = lnn_out((i-1)*jte+j,7:)
+         ! lwupt(i, j) = lnn_out((i-1)*jte+j,1)
+         ! lwuptc(i, j) = lnn_out((i-1)*jte+j,2)
+         ! lwupb(i, j) = lnn_out((i-1)*jte+j,3)
+         ! lwupbc(i, j) = lnn_out((i-1)*jte+j,4)
+         ! lwdnb(i, j) = lnn_out((i-1)*jte+j,5)
+         ! lwdnbc(i, j) = lnn_out((i-1)*jte+j,6)
+         ! rthratenlw(i,1:nlev,j) = lnn_out((i-1)*jte+j,7:)
 
          ! Outputs for NN emulation
          o_rthratensw(i,:,j) = rthratensw(i,:,j) ! total sky shortwave radiative heating rate (K/s) 
@@ -11090,8 +11124,8 @@ contains
    where (swdnb  < 0.d0) swdnb  = 0.d0
 
    ! Diagnostic variables
-   glw(:,:)  = lwdnb(:,:)
-   olr(:,:)  = lwupt(:,:)
+   ! glw(:,:)  = lwdnb(:,:)
+   ! olr(:,:)  = lwupt(:,:)
    gsw(:,:)  = swdnb(:,:) - swupb(:,:)
 
    end subroutine rad_rrtmg_driver
